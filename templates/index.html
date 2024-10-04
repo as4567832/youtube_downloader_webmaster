@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Playlist Downloader</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+        }
+        form {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        input[type="text"], select {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        button {
+            background: #5cb85c;
+            color: #fff;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+        }
+        button:hover {
+            background: #4cae4c;
+        }
+        .progress {
+            width: 100%;
+            background: #ddd;
+            border-radius: 5px;
+            height: 20px;
+            margin: 10px 0;
+            position: relative;
+        }
+        .progress-bar {
+            height: 100%;
+            background: #5cb85c;
+            transition: width 0.4s;
+        }
+        .status {
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>YouTube Playlist Downloader</h1>
+    <form id="downloadForm">
+        <input type="text" id="playlist_url" placeholder="Enter YouTube Playlist URL" required>
+        <button type="submit">Get Formats</button>
+    </form>
+
+    <div id="formatSection" style="display: none;">
+        <h2>Select Video Format</h2>
+        <select id="formatSelect"></select>
+        <button id="startDownload">Start Download</button>
+    </div>
+
+    <div id="progressSection" style="display: none;">
+        <h2>Download Progress</h2>
+        <div class="progress">
+            <div class="progress-bar" id="progressBar" style="width: 0%;"></div>
+        </div>
+        <div class="status" id="statusText"></div>
+    </div>
+
+    <script>
+        $(document).ready(function () {
+            $('#downloadForm').on('submit', function (e) {
+                e.preventDefault();
+                const playlistUrl = $('#playlist_url').val();
+                $.post('/get_formats', { playlist_url: playlistUrl }, function (data) {
+                    if (data.status === 'success') {
+                        $('#formatSelect').empty();
+                        $.each(data.formats, function (index, format) {
+                            $('#formatSelect').append(`<option value="${format.format_id}">${format.description}</option>`);
+                        });
+                        $('#formatSection').show();
+                    } else {
+                        alert(data.message);
+                    }
+                }).fail(function (xhr) {
+                    alert(xhr.responseJSON.message);
+                });
+            });
+
+            $('#startDownload').on('click', function () {
+                const playlistUrl = $('#playlist_url').val();
+                const selectedFormat = $('#formatSelect').val();
+                $.ajax({
+                    url: '/start_download',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ playlist_url: playlistUrl, selected_format: selectedFormat }),
+                    success: function (data) {
+                        if (data.status) {
+                            $('#progressSection').show();
+                            checkProgress();
+                        }
+                    },
+                    error: function (xhr) {
+                        alert(xhr.responseJSON.message);
+                    }
+                });
+            });
+
+            function checkProgress() {
+                $.get('/progress', function (data) {
+                    $('#progressBar').css('width', data.total_progress + '%');
+                    $('#statusText').text(`Current Video: ${data.current_title} - Speed: ${data.current_speed / 1000} KB/s`);
+
+                    if (data.total_progress < 100) {
+                        setTimeout(checkProgress, 2000);
+                    } else {
+                        alert("Download completed!");
+                    }
+                });
+            }
+        });
+    </script>
+
+</body>
+</html>
